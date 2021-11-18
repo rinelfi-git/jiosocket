@@ -6,6 +6,7 @@ import mg.rinelfi.jiosocket.TCPEvent;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
 
 class TCPClientHandler {
@@ -13,8 +14,10 @@ class TCPClientHandler {
     private List<TCPEvent> events;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
+    private int udpServer;
     
     public TCPClientHandler(Socket client) {
+        this.events = new ArrayList<>();
         this.socket = client;
         Thread thread = new Thread(() -> {
             try {
