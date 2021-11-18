@@ -5,6 +5,7 @@ import mg.rinelfi.jiosocket.TCPCallback;
 import mg.rinelfi.jiosocket.TCPEvent;
 
 import java.io.*;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,19 +14,21 @@ public class TCPClient {
     private Socket socket;
     private boolean connected;
     private String target;
-    private int port;
+    private int tcpPort, udpPort, minDatagramPort, maxDatagramPort;
     private List<TCPEvent> events;
     private ObjectOutputStream outputStream;
     private ObjectInputStream inputStream;
     
-    public TCPClient(String target, int port) {
+    public TCPClient(String target, int tcpPort) {
         this.target = target;
-        this.port = port;
+        this.tcpPort = tcpPort;
         this.events = new ArrayList<>();
+        this.minDatagramPort = 49152;
+        this.maxDatagramPort = 65535;
     }
     
     public synchronized void connect() throws IOException {
-        this.socket = new Socket(target, port);
+        this.socket = new Socket(target, tcpPort);
         this.connected = this.socket != null && this.socket.isConnected();
         Thread thread = new Thread(() -> {
             try {
@@ -73,8 +76,29 @@ public class TCPClient {
     }
     
     public TCPClient onConnection(TCPCallback callback) {
-        if(this.connected) callback.update(null);
+        if (this.connected) callback.update(null);
         else this.on(Events.CONNECT, callback);
         return this;
+    }
+    
+    public void setMinDatagramPort(int port) {
+        this.minDatagramPort = port;
+    }
+    
+    public void setMaxDatagramPort(int port) {
+        this.maxDatagramPort = port;
+    }
+    
+    public void getDatagramPort() {
+        for (int iteration = this.minDatagramPort; iteration <= this.maxDatagramPort && this.udpPort == 0; iteration++) {
+            try {
+                System.out.println("port : " + iteration);
+                ServerSocket test = new ServerSocket(iteration);
+                test.close();
+                this.udpPort = iteration;
+            } catch (IOException e) {
+                System.out.println(String.format("[WARNING] Le port %5d n'est pas disponible\n", iteration));
+            }
+        }
     }
 }
