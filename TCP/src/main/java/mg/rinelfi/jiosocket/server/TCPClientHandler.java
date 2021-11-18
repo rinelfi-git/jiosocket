@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 class TCPClientHandler {
+    private String id;
     private Socket socket;
     private List<TCPEvent> events;
     private ObjectInputStream inputStream;
@@ -43,6 +44,14 @@ class TCPClientHandler {
         });
         thread.setDaemon(true);
         thread.start();
+    }
+    
+    public String getId() {
+        return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
     }
     
     public synchronized TCPClientHandler on(String event, TCPCallback callback) {
