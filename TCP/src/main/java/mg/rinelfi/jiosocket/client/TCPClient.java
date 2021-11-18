@@ -92,7 +92,6 @@ public class TCPClient {
     public void getDatagramPort() {
         for (int iteration = this.minDatagramPort; iteration <= this.maxDatagramPort && this.udpPort == 0; iteration++) {
             try {
-                System.out.println("port : " + iteration);
                 ServerSocket test = new ServerSocket(iteration);
                 test.close();
                 this.udpPort = iteration;
@@ -100,5 +99,6 @@ public class TCPClient {
                 System.out.println(String.format("[WARNING] Le port %5d n'est pas disponible\n", iteration));
             }
         }
+        this.emit(Events.UDP_PORT, String.valueOf(this.udpPort));
     }
 }

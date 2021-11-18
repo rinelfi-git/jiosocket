@@ -23,7 +23,8 @@ class TCPClientHandler {
             try {
                 while (true) {
                     this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
-                    String[] input = (String[]) this.inputStream.readObject();
+                    Object object = this.inputStream.readObject();
+                    String[] input = (String[]) object;
                     this.events.forEach(consumer -> {
                         String event = consumer.getEvent();
                         TCPCallback callback = consumer.getCallback();
@@ -43,6 +44,7 @@ class TCPClientHandler {
         });
         thread.setDaemon(true);
         thread.start();
+        this.on(Events.UDP_PORT, data -> this.udpServer = Integer.parseInt(data));
     }
     
     public synchronized TCPClientHandler on(String event, TCPCallback callback) {
