@@ -14,7 +14,6 @@ class TCPClientHandler {
     private List<TCPEvent> events;
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
-    private int udpServer;
     
     public TCPClientHandler(Socket client) {
         this.events = new ArrayList<>();
@@ -44,7 +43,6 @@ class TCPClientHandler {
         });
         thread.setDaemon(true);
         thread.start();
-        this.on(Events.UDP_PORT, data -> this.udpServer = Integer.parseInt(data));
     }
     
     public synchronized TCPClientHandler on(String event, TCPCallback callback) {
