@@ -107,7 +107,7 @@ public class TCPClient {
         } else {
             /**
              * wait for socket disponibility
-             * and
+             * and store it in an arraylist
              */
             this.eventsStacks.add(new String[]{event, json});
         }
