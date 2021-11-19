@@ -9,7 +9,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-class TCPClientHandler {
+class TCPClientHandler implements Runnable{
     private String id;
     private Socket socket;
     private List<TCPEvent> events;
@@ -19,31 +19,6 @@ class TCPClientHandler {
     public TCPClientHandler(Socket client) {
         this.events = new ArrayList<>();
         this.socket = client;
-        Thread thread = new Thread(() -> {
-            try {
-                while (true) {
-                    this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
-                    Object object = this.inputStream.readObject();
-                    String[] input = (String[]) object;
-                    this.events.forEach(consumer -> {
-                        String event = consumer.getEvent();
-                        TCPCallback callback = consumer.getCallback();
-                        String listenEvent = input[0];
-                        String json = input[1];
-                        if (listenEvent.equals(event)) {
-                            callback.update(json);
-                        }
-                    });
-                }
-            } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
-                if(this.socket.isClosed() || !this.socket.isConnected()) {
-            
-                }
-            }
-        });
-        thread.setDaemon(true);
-        thread.start();
     }
     
     public String getId() {
@@ -72,11 +47,53 @@ class TCPClientHandler {
         return this;
     }
     
+    private void triggerDisconnect() {
+    
+    }
+    
     public void onDisconnect(TCPCallback callback) {
         callback.update(null);
     }
     
     public void triggerConnect() {
         this.emit(Events.CONNECT, null);
+    }
+    
+    @Override
+    public void run() {
+        System.out.println("listening");
+        try {
+            while (true) {
+                /**
+                 * listen on input stream
+                 * wether there is a packet or not
+                 */
+                this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
+                Object object = this.inputStream.readObject();
+                String[] input = (String[]) object;
+                /**
+                 * loop on registered events
+                 * and trigger callback on event
+                 */
+                this.events.forEach(consumer -> {
+                    String event = consumer.getEvent();
+                    TCPCallback callback = consumer.getCallback();
+                    String listenEvent = input[0];
+                    String json = input[1];
+                    if (listenEvent.equals(event)) {
+                        callback.update(json);
+                    }
+                });
+            }
+        } catch (IOException | ClassNotFoundException e) {
+            // e.printStackTrace();
+            /**
+             * If connection is closed by user
+             * then notify the server manager to remove the handler
+             */
+            if(this.socket.isClosed() || !this.socket.isConnected()) {
+                this.triggerDisconnect();
+            }
+        }
     }
 }

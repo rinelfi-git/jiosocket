@@ -13,10 +13,12 @@ import java.util.List;
 public class TCPClient {
     private Socket socket;
     private boolean connected;
-    private String target;
-    private int tcpPort, udpPort, minDatagramPort, maxDatagramPort;
-    private List<TCPEvent> events;
-    private ObjectOutputStream outputStream;
+    private final String target;
+    private final int tcpPort;
+    private int udpPort;
+    private int minDatagramPort;
+    private int maxDatagramPort;
+    private final List<TCPEvent> events;
     private ObjectInputStream inputStream;
     
     public TCPClient(String target, int tcpPort) {
@@ -27,12 +29,34 @@ public class TCPClient {
         this.maxDatagramPort = 65535;
     }
     
-    public synchronized void connect() throws IOException {
-        this.socket = new Socket(target, tcpPort);
-        this.connected = this.socket != null && this.socket.isConnected();
+    public synchronized void connect() {
+        final int timeout = 3000;
+        Thread t = new Thread(() -> {
+            while(!this.connected) {
+                try {
+                    this.socket = new Socket(target, tcpPort);
+                    this.connected = true;
+                    this.listen();
+                    System.out.println("[INFO] Connexion au server succès");
+                } catch (IOException e) {
+                    // e.printStackTrace();
+                    System.out.println("[WARNING] Erreur de connexion; tentative dans " + (timeout / 1000) + " seconde(s)");
+                    try {
+                        Thread.sleep(3000);
+                    } catch (InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+    }
+    
+    public void listen() {
         Thread thread = new Thread(() -> {
             try {
-                while (true) {
+                while (this.connected) {
                     this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
                     Object object = this.inputStream.readObject();
                     String[] input = (String[]) object;
@@ -51,6 +75,10 @@ public class TCPClient {
                 }
             } catch (IOException | ClassNotFoundException e) {
                 e.printStackTrace();
+                if(this.socket.isClosed() || !this.socket.isConnected()) {
+                    System.out.println("[WARNING] Fin de la connexion");
+                    this.connect();
+                }
             }
         });
         thread.setDaemon(true);
@@ -60,9 +88,9 @@ public class TCPClient {
     public TCPClient emit(String event, String json) {
         try {
             if (this.socket != null && !this.socket.isClosed()) {
-                this.outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                this.outputStream.writeObject(new String[]{event, json});
-                this.outputStream.flush();
+                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                outputStream.writeObject(new String[]{event, json});
+                outputStream.flush();
             }
         } catch (IOException e) {
             e.printStackTrace();
