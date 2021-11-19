@@ -69,17 +69,19 @@ public class TCPClient {
                 while (this.connected) {
                     this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
                     Object object = this.inputStream.readObject();
-                    String[] input = (String[]) object;
-                    String listenEvent = input[0],
-                        json = input[1];
-                    if (this.events.containsKey(listenEvent)) {
-                        if (listenEvent.equals(Events.CONNECT)) {
-                            this.connected = true;
-                            this.events.get(listenEvent).update(null);
-                        } else {
-                            this.events.get(listenEvent).update(json);
+                    new Thread(() -> {
+                        String[] input = (String[]) object;
+                        String listenEvent = input[0],
+                            json = input[1];
+                        if (this.events.containsKey(listenEvent)) {
+                            if (listenEvent.equals(Events.CONNECT)) {
+                                this.connected = true;
+                                this.events.get(listenEvent).update(null);
+                            } else {
+                                this.events.get(listenEvent).update(json);
+                            }
                         }
-                    }
+                    }).start();
                 }
             } catch (IOException | ClassNotFoundException e) {
                 // e.printStackTrace();

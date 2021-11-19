@@ -32,15 +32,17 @@ class TCPClientHandler implements Runnable {
     }
     
     public TCPClientHandler emit(String event, String json) {
-        try {
-            if (this.socket != null && !this.socket.isClosed()) {
-                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                outputStream.writeObject(new String[]{event, json});
-                outputStream.flush();
+        new Thread(() -> {
+            try {
+                if (this.socket != null && !this.socket.isClosed()) {
+                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                    outputStream.writeObject(new String[]{event, json});
+                    outputStream.flush();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        }).start();
         return this;
     }
     
@@ -71,14 +73,16 @@ class TCPClientHandler implements Runnable {
              */
             ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
             Object object = inputStream.readObject();
-            String[] input = (String[]) object;
-            /**
-             * loop on registered events
-             * and trigger callback on event
-             */
-            String listenEvent = input[0],
-                json = input[1];
-            if (this.events.containsKey(listenEvent)) this.events.get(listenEvent).update(json);
+            new Thread(() -> {
+                String[] input = (String[]) object;
+                /**
+                 * loop on registered events
+                 * and trigger callback on event
+                 */
+                String listenEvent = input[0],
+                    json = input[1];
+                if (this.events.containsKey(listenEvent)) this.events.get(listenEvent).update(json);
+            }).start();
         } catch (IOException | ClassNotFoundException e) {
             // e.printStackTrace();
             /**
