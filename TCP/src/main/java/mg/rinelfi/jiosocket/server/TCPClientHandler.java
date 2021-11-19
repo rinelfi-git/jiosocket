@@ -2,22 +2,19 @@ package mg.rinelfi.jiosocket.server;
 
 import mg.rinelfi.jiosocket.Events;
 import mg.rinelfi.jiosocket.TCPCallback;
-import mg.rinelfi.jiosocket.TCPEvent;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
-class TCPClientHandler implements Runnable{
+class TCPClientHandler implements Runnable {
     private String id;
-    private Socket socket;
-    private List<TCPEvent> events;
-    private ObjectInputStream inputStream;
-    private ObjectOutputStream outputStream;
+    private final Socket socket;
+    private Map<String, TCPCallback> events;
     
     public TCPClientHandler(Socket client) {
-        this.events = new ArrayList<>();
+        this.events = new HashMap<>();
         this.socket = client;
     }
     
@@ -29,17 +26,17 @@ class TCPClientHandler implements Runnable{
         this.id = id;
     }
     
-    public synchronized TCPClientHandler on(String event, TCPCallback callback) {
-        this.events.add(new TCPEvent(event, callback));
+    public TCPClientHandler on(String event, TCPCallback callback) {
+        this.events.put(event, callback);
         return this;
     }
     
     public TCPClientHandler emit(String event, String json) {
         try {
             if (this.socket != null && !this.socket.isClosed()) {
-                this.outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                this.outputStream.writeObject(new String[]{event, json});
-                this.outputStream.flush();
+                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                outputStream.writeObject(new String[]{event, json});
+                outputStream.flush();
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -61,39 +58,40 @@ class TCPClientHandler implements Runnable{
     
     @Override
     public void run() {
-        System.out.println("listening");
+        while (this.socket.isConnected() && !this.socket.isClosed()) {
+            this.listen();
+        }
+    }
+    
+    private void listen() {
         try {
-            while (true) {
-                /**
-                 * listen on input stream
-                 * wether there is a packet or not
-                 */
-                this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
-                Object object = this.inputStream.readObject();
-                String[] input = (String[]) object;
-                /**
-                 * loop on registered events
-                 * and trigger callback on event
-                 */
-                this.events.forEach(consumer -> {
-                    String event = consumer.getEvent();
-                    TCPCallback callback = consumer.getCallback();
-                    String listenEvent = input[0];
-                    String json = input[1];
-                    if (listenEvent.equals(event)) {
-                        callback.update(json);
-                    }
-                });
-            }
+            /**
+             * listen on input stream
+             * wether there is a packet or not
+             */
+            ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
+            Object object = inputStream.readObject();
+            String[] input = (String[]) object;
+            /**
+             * loop on registered events
+             * and trigger callback on event
+             */
+            String listenEvent = input[0],
+                json = input[1];
+            if (this.events.containsKey(listenEvent)) this.events.get(listenEvent).update(json);
         } catch (IOException | ClassNotFoundException e) {
             // e.printStackTrace();
             /**
              * If connection is closed by user
              * then notify the server manager to remove the handler
              */
-            if(this.socket.isClosed() || !this.socket.isConnected()) {
+            if (this.socket.isClosed() || !this.socket.isConnected()) {
                 this.triggerDisconnect();
             }
         }
+    }
+    
+    public void setEvents(Map<String, TCPCallback> events) {
+        this.events = events;
     }
 }

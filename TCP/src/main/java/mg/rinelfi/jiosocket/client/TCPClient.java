@@ -2,13 +2,14 @@ package mg.rinelfi.jiosocket.client;
 
 import mg.rinelfi.jiosocket.Events;
 import mg.rinelfi.jiosocket.TCPCallback;
-import mg.rinelfi.jiosocket.TCPEvent;
 
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class TCPClient {
     private Socket socket;
@@ -18,26 +19,28 @@ public class TCPClient {
     private int udpPort;
     private int minDatagramPort;
     private int maxDatagramPort;
-    private final List<TCPEvent> events;
+    private final Map<String, TCPCallback> events;
     private ObjectInputStream inputStream;
+    private final List<String[]> eventsStacks;
     
     public TCPClient(String target, int tcpPort) {
         this.target = target;
         this.tcpPort = tcpPort;
-        this.events = new ArrayList<>();
         this.minDatagramPort = 49152;
         this.maxDatagramPort = 65535;
+        this.events = new HashMap<>();
+        this.eventsStacks = new ArrayList<>();
+        
     }
     
-    public synchronized void connect() {
+    public void connect() {
         final int timeout = 3000;
         Thread t = new Thread(() -> {
-            while(!this.connected) {
+            while (!this.connected) {
                 try {
                     this.socket = new Socket(target, tcpPort);
                     this.connected = true;
                     this.listen();
-                    System.out.println("[INFO] Connexion au server succès");
                 } catch (IOException e) {
                     // e.printStackTrace();
                     System.out.println("[WARNING] Erreur de connexion; tentative dans " + (timeout / 1000) + " seconde(s)");
@@ -48,36 +51,41 @@ public class TCPClient {
                     }
                 }
             }
+            /**
+             * check if there is stored events before socket is initialized
+             */
+            if (this.eventsStacks.size() > 0) {
+                this.eventsStacks.forEach(eventsStack -> this.emit(eventsStack[0], eventsStack[1]));
+                this.eventsStacks.clear();
+            }
         });
         t.setDaemon(true);
         t.start();
     }
     
-    public void listen() {
+    private void listen() {
         Thread thread = new Thread(() -> {
             try {
                 while (this.connected) {
                     this.inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
                     Object object = this.inputStream.readObject();
                     String[] input = (String[]) object;
-                    String listenEvent = input[0];
-                    String json = input[1];
-                    this.events.forEach(consumer -> {
-                        String event = consumer.getEvent();
-                        TCPCallback callback = consumer.getCallback();
-                        if (listenEvent.equals(Events.CONNECT) && event.equals(Events.CONNECT)) {
+                    String listenEvent = input[0],
+                        json = input[1];
+                    if (this.events.containsKey(listenEvent)) {
+                        if (listenEvent.equals(Events.CONNECT)) {
                             this.connected = true;
-                            callback.update(null);
-                        } else if (listenEvent.equals(event)) {
-                            callback.update(json);
+                            this.events.get(listenEvent).update(null);
+                        } else {
+                            this.events.get(listenEvent).update(json);
                         }
-                    });
+                    }
                 }
             } catch (IOException | ClassNotFoundException e) {
-                e.printStackTrace();
-                if(this.socket.isClosed() || !this.socket.isConnected()) {
-                    System.out.println("[WARNING] Fin de la connexion");
-                    this.connect();
+                // e.printStackTrace();
+                this.connect();
+                if (this.socket.isClosed() || !this.socket.isConnected()) {
+                    System.out.println("[WARNING] Fin de la connexion ou erreur de conversion");
                 }
             }
         });
@@ -85,21 +93,29 @@ public class TCPClient {
         thread.start();
     }
     
-    public TCPClient emit(String event, String json) {
-        try {
-            if (this.socket != null && !this.socket.isClosed()) {
-                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                outputStream.writeObject(new String[]{event, json});
-                outputStream.flush();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+    public synchronized TCPClient emit(String event, String json) {
+        if (this.socket != null && !this.socket.isClosed()) {
+            new Thread(() -> {
+                try {
+                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                    outputStream.writeObject(new String[]{event, json});
+                    outputStream.flush();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        } else {
+            /**
+             * wait for socket disponibility
+             * and
+             */
+            this.eventsStacks.add(new String[]{event, json});
         }
         return this;
     }
     
-    public synchronized TCPClient on(String event, TCPCallback callback) {
-        this.events.add(new TCPEvent(event, callback));
+    public TCPClient on(String event, TCPCallback callback) {
+        this.events.put(event, callback);
         return this;
     }
     
