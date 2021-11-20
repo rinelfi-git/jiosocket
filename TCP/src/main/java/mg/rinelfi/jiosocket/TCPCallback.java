@@ -1,5 +1,5 @@
 package mg.rinelfi.jiosocket;
 
 public interface TCPCallback {
-    void update(String data);
+    void update(String json);
 }
