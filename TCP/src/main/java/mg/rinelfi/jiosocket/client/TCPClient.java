@@ -13,12 +13,10 @@ import java.util.Map;
 
 public class TCPClient {
     private Socket socket;
-    private boolean connected;
+    private boolean connected, reconnect;
     private final String target;
     private final int tcpPort;
-    private int udpPort;
-    private int minDatagramPort;
-    private int maxDatagramPort;
+    private int udpPort, timeout;
     private final Map<String, TCPCallback> events;
     private ObjectInputStream inputStream;
     private final List<String[]> eventsStacks;
@@ -26,15 +24,14 @@ public class TCPClient {
     public TCPClient(String target, int tcpPort) {
         this.target = target;
         this.tcpPort = tcpPort;
-        this.minDatagramPort = 49152;
-        this.maxDatagramPort = 65535;
+        this.reconnect = true;
+        this.timeout = 3000;
         this.events = new HashMap<>();
         this.eventsStacks = new ArrayList<>();
         
     }
     
     public void connect() {
-        final int timeout = 3000;
         Thread t = new Thread(() -> {
             while (!this.connected) {
                 try {
@@ -45,7 +42,7 @@ public class TCPClient {
                     // e.printStackTrace();
                     System.out.println("[WARNING] Erreur de connexion; tentative dans " + (timeout / 1000) + " seconde(s)");
                     try {
-                        Thread.sleep(3000);
+                        Thread.sleep(timeout);
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
                     }
@@ -85,8 +82,11 @@ public class TCPClient {
                 }
             } catch (IOException | ClassNotFoundException e) {
                 // e.printStackTrace();
-                this.connect();
                 if (this.socket.isClosed() || !this.socket.isConnected()) {
+                    /**
+                     * Check if client want the socket to reconnect after its link has broken
+                     */
+                    if(this.reconnect) this.connect();
                     System.out.println("[WARNING] Fin de la connexion ou erreur de conversion");
                 }
             }
@@ -127,24 +127,13 @@ public class TCPClient {
         return this;
     }
     
-    public void setMinDatagramPort(int port) {
-        this.minDatagramPort = port;
+    public TCPClient setAutoreconnection(boolean reconnection) {
+        this.reconnect = reconnection;
+        return this;
     }
     
-    public void setMaxDatagramPort(int port) {
-        this.maxDatagramPort = port;
-    }
-    
-    public void getDatagramPort() {
-        for (int iteration = this.minDatagramPort; iteration <= this.maxDatagramPort && this.udpPort == 0; iteration++) {
-            try {
-                ServerSocket test = new ServerSocket(iteration);
-                test.close();
-                this.udpPort = iteration;
-            } catch (IOException e) {
-                System.out.println(String.format("[WARNING] Le port %5d n'est pas disponible\n", iteration));
-            }
-        }
-        this.emit(Events.UDP_PORT, String.valueOf(this.udpPort));
+    public TCPClient setTimeout(int timeout) {
+        this.timeout = timeout;
+        return this;
     }
 }
