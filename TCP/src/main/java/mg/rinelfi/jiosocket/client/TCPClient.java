@@ -121,12 +121,6 @@ public class TCPClient {
         return this;
     }
     
-    public TCPClient onConnection(TCPCallback callback) {
-        if (this.connected) callback.update(null);
-        else this.on(Events.CONNECT, callback);
-        return this;
-    }
-    
     public TCPClient setAutoreconnection(boolean reconnection) {
         this.reconnect = reconnection;
         return this;

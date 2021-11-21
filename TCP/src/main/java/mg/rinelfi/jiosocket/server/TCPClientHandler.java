@@ -9,26 +9,32 @@ import java.util.HashMap;
 import java.util.Map;
 
 class TCPClientHandler implements Runnable {
-    private String id;
+    private String identity;
     private final Socket socket;
     private Map<String, TCPCallback> events;
+    private SocketCloseListener socketCloseListener;
     
     public TCPClientHandler(Socket client) {
         this.events = new HashMap<>();
         this.socket = client;
     }
     
-    public String getId() {
-        return id;
+    public String getIdentity() {
+        return identity;
     }
     
-    public void setId(String id) {
-        this.id = id;
+    public void setIdentity(String identity) {
+        this.identity = identity;
     }
     
     public TCPClientHandler on(String event, TCPCallback callback) {
-        this.events.put(event, callback);
+        if (!event.equals(Events.DISCONNECT))
+            this.events.put(event, callback);
         return this;
+    }
+    
+    public void onDisconnect(SocketCloseListener listener) {
+        this.socketCloseListener = listener;
     }
     
     public TCPClientHandler emit(String event, String json) {
@@ -50,10 +56,6 @@ class TCPClientHandler implements Runnable {
     
     }
     
-    public void onDisconnect(TCPCallback callback) {
-        callback.update(null);
-    }
-    
     public void triggerConnect() {
         this.emit(Events.CONNECT, null);
     }
@@ -73,16 +75,17 @@ class TCPClientHandler implements Runnable {
              */
             ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(this.socket.getInputStream()));
             Object object = inputStream.readObject();
-            new Thread(() -> {
-                String[] input = (String[]) object;
-                /**
-                 * loop on registered events
-                 * and trigger callback on event
-                 */
-                String listenEvent = input[0],
-                    json = input[1];
-                if (this.events.containsKey(listenEvent)) this.events.get(listenEvent).update(json);
-            }).start();
+            String[] input = (String[]) object;
+            /**
+             * loop on registered events
+             * and trigger callback on event
+             */
+            String listenEvent = input[0],
+                json = input[1];
+            if (this.events.containsKey(listenEvent)) {
+                if (listenEvent.equals(Events.DISCONNECT)) this.socket.close();
+                this.events.get(listenEvent).update(json);
+            }
         } catch (IOException | ClassNotFoundException e) {
             // e.printStackTrace();
             /**
@@ -90,7 +93,7 @@ class TCPClientHandler implements Runnable {
              * then notify the server manager to remove the handler
              */
             if (this.socket.isClosed() || !this.socket.isConnected()) {
-                this.triggerDisconnect();
+                this.socketCloseListener.trigger();
             }
         }
     }
