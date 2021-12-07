@@ -28,8 +28,7 @@ class TCPClientHandler implements Runnable {
     }
     
     public TCPClientHandler on(String event, TCPCallback callback) {
-        if (!event.equals(Events.DISCONNECT))
-            this.events.put(event, callback);
+        this.events.put(event, callback);
         return this;
     }
     
@@ -38,26 +37,16 @@ class TCPClientHandler implements Runnable {
     }
     
     public TCPClientHandler emit(String event, String json) {
-        new Thread(() -> {
-            try {
-                if (this.socket != null && !this.socket.isClosed()) {
-                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                    outputStream.writeObject(new String[]{event, json});
-                    outputStream.flush();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+        try {
+            if (this.socket != null && !this.socket.isClosed()) {
+                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                outputStream.writeObject(new String[]{event, json});
+                outputStream.flush();
             }
-        }).start();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         return this;
-    }
-    
-    private void triggerDisconnect() {
-    
-    }
-    
-    public void triggerConnect() {
-        this.emit(Events.CONNECT, null);
     }
     
     @Override

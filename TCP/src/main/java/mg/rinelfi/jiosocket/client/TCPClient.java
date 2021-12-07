@@ -4,7 +4,7 @@ import mg.rinelfi.jiosocket.Events;
 import mg.rinelfi.jiosocket.TCPCallback;
 
 import java.io.*;
-import java.net.ServerSocket;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,7 +73,7 @@ public class TCPClient {
                         if (this.events.containsKey(listenEvent)) {
                             if (listenEvent.equals(Events.CONNECT)) {
                                 this.connected = true;
-                                this.events.get(listenEvent).update(null);
+                                this.events.get(listenEvent).update(json);
                             } else {
                                 this.events.get(listenEvent).update(json);
                             }
@@ -129,5 +129,33 @@ public class TCPClient {
     public TCPClient setTimeout(int timeout) {
         this.timeout = timeout;
         return this;
+    }
+    
+    public String getRemoteAddress() {
+        String remoteAddress;
+        if(this.socket == null) remoteAddress = "localhost";
+        else remoteAddress = this.socket.getInetAddress().getCanonicalHostName();
+        return remoteAddress;
+    }
+    
+    public int getRemotePort() {
+        int remotePort;
+        if(this.socket == null) remotePort = -1;
+        else remotePort = this.socket.getPort();
+        return remotePort;
+    }
+    
+    public String getLocalAddress() {
+        String localAddress;
+        if(this.socket == null) localAddress = "localhost";
+        else localAddress = this.socket.getLocalAddress().getCanonicalHostName();
+        return localAddress;
+    }
+    
+    public int getLocalPort() {
+        int localPort;
+        if(this.socket == null) localPort = -1;
+        else localPort = this.socket.getLocalPort();
+        return localPort;
     }
 }

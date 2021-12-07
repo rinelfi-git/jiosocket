@@ -8,9 +8,7 @@ import org.mindrot.jbcrypt.BCrypt;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class TCPServer extends Thread{
@@ -32,19 +30,23 @@ public class TCPServer extends Thread{
                 TCPClientHandler handler = new TCPClientHandler(client);
                 Long currentTime = System.currentTimeMillis();
                 String hash = BCrypt.hashpw(currentTime.toString(), BCrypt.gensalt(12));
-                JSONObject json = new JSONObject();
-                json.put("address", client.getInetAddress().getCanonicalHostName());
-                json.put("port", client.getPort());
-                handler.emit(Events.CONNECT, json.toString());
-                Thread.sleep(500);
+                JSONObject jsonObject = new JSONObject();
+                jsonObject.put("address", client.getInetAddress().getCanonicalHostName());
+                jsonObject.put("port", client.getPort());
+                jsonObject.put("identifier", hash);
+                handler.setIdentity(hash);
+                System.out.println("Server : " + hash);
+                handler.emit(Events.CONNECT, jsonObject.toString());
                 this.handlers.put(hash, handler);
                 handler.setEvents(this.events);
+                handler.on(Events.GET_OWN_IDENTITY, json -> handler.emit(Events.GET_OWN_IDENTITY, (new JSONObject()).put("identity", hash).toString()));
                 handler.onDisconnect(() -> {
-                    this.handlers.remove(handler);
+                    this.handlers.remove(hash);
                 });
                 Thread t = new Thread(handler);
                 t.setDaemon(true);
                 t.start();
+                Thread.sleep(500);
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
