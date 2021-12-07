@@ -30,12 +30,14 @@ public class TCPServer extends Thread{
                 TCPClientHandler handler = new TCPClientHandler(client);
                 Long currentTime = System.currentTimeMillis();
                 String hash = BCrypt.hashpw(currentTime.toString(), BCrypt.gensalt(12));
+                // Payloads for new user
                 JSONObject jsonObject = new JSONObject();
                 jsonObject.put("address", client.getInetAddress().getCanonicalHostName());
                 jsonObject.put("port", client.getPort());
                 jsonObject.put("identifier", hash);
+                
+                // setting identity for the thread
                 handler.setIdentity(hash);
-                System.out.println("Server : " + hash);
                 handler.emit(Events.CONNECT, jsonObject.toString());
                 this.handlers.put(hash, handler);
                 handler.setEvents(this.events);
