@@ -1,6 +1,6 @@
 package mg.rinelfi.jiosocket.server;
 
-import mg.rinelfi.jiosocket.Events;
+import mg.rinelfi.jiosocket.SocketEvents;
 import mg.rinelfi.jiosocket.TCPCallback;
 
 import java.io.*;
@@ -13,8 +13,10 @@ class TCPClientHandler implements Runnable {
     private final Socket socket;
     private Map<String, TCPCallback> events;
     private SocketCloseListener socketCloseListener;
+    private boolean connected;
     
     public TCPClientHandler(Socket client) {
+        this.connected = false;
         this.events = new HashMap<>();
         this.socket = client;
     }
@@ -51,7 +53,8 @@ class TCPClientHandler implements Runnable {
     
     @Override
     public void run() {
-        while (this.socket.isConnected() && !this.socket.isClosed()) {
+        this.connected = true;
+        while (this.connected) {
             this.listen();
         }
     }
@@ -71,19 +74,19 @@ class TCPClientHandler implements Runnable {
              */
             String listenEvent = input[0],
                 json = input[1];
-            if (this.events.containsKey(listenEvent)) {
-                if (listenEvent.equals(Events.DISCONNECT)) this.socket.close();
+            if (input.length == 3 && input[2].equals(this.identity)) {
+                this.events.get(listenEvent).update(json);
+            } else if (this.events.containsKey(listenEvent)) {
+                if (listenEvent.equals(SocketEvents.DISCONNECT)) this.socket.close();
                 this.events.get(listenEvent).update(json);
             }
         } catch (IOException | ClassNotFoundException e) {
-            // e.printStackTrace();
             /**
              * If connection is closed by user
              * then notify the server manager to remove the handler
              */
-            if (this.socket.isClosed() || !this.socket.isConnected()) {
-                this.socketCloseListener.trigger();
-            }
+            this.connected = false;
+            this.socketCloseListener.trigger();
         }
     }
     

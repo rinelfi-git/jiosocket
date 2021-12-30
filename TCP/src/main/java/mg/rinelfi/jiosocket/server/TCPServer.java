@@ -1,14 +1,17 @@
 package mg.rinelfi.jiosocket.server;
 
-import mg.rinelfi.jiosocket.Events;
+import mg.rinelfi.jiosocket.SocketEvents;
 import mg.rinelfi.jiosocket.TCPCallback;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.mindrot.jbcrypt.BCrypt;
+import sun.awt.X11.XKeyboardFocusManagerPeer;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 public class TCPServer extends Thread{
@@ -28,8 +31,8 @@ public class TCPServer extends Thread{
             try {
                 Socket client = this.server.accept();
                 TCPClientHandler handler = new TCPClientHandler(client);
-                Long currentTime = System.currentTimeMillis();
-                String hash = BCrypt.hashpw(currentTime.toString(), BCrypt.gensalt(12));
+                long currentTime = System.currentTimeMillis();
+                String hash = BCrypt.hashpw(Long.toString(currentTime), BCrypt.gensalt(12));
                 // Payloads for new user
                 JSONObject jsonObject = new JSONObject();
                 jsonObject.put("address", client.getInetAddress().getCanonicalHostName());
@@ -38,10 +41,19 @@ public class TCPServer extends Thread{
                 
                 // setting identity for the thread
                 handler.setIdentity(hash);
-                handler.emit(Events.CONNECT, jsonObject.toString());
                 this.handlers.put(hash, handler);
+                
+                // sending connection status done
+                handler.emit(SocketEvents.CONNECT, jsonObject.toString());
+    
+                // prepare to broadcast the connected users
+                System.out.println("broadcast");
+                JSONArray identities = new JSONArray();
+                for (String key : this.handlers.keySet()) identities.put(key);
+                this.emit(SocketEvents.BROADCAST_IDENTITY, new JSONObject().put("identities", identities).toString());
+                
                 handler.setEvents(this.events);
-                handler.on(Events.GET_OWN_IDENTITY, json -> handler.emit(Events.GET_OWN_IDENTITY, (new JSONObject()).put("identity", hash).toString()));
+                
                 handler.onDisconnect(() -> {
                     this.handlers.remove(hash);
                 });

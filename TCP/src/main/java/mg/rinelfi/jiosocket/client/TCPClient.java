@@ -1,10 +1,9 @@
 package mg.rinelfi.jiosocket.client;
 
-import mg.rinelfi.jiosocket.Events;
+import mg.rinelfi.jiosocket.SocketEvents;
 import mg.rinelfi.jiosocket.TCPCallback;
 
 import java.io.*;
-import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -71,7 +70,7 @@ public class TCPClient {
                         String listenEvent = input[0],
                             json = input[1];
                         if (this.events.containsKey(listenEvent)) {
-                            if (listenEvent.equals(Events.CONNECT)) {
+                            if (listenEvent.equals(SocketEvents.CONNECT)) {
                                 this.connected = true;
                                 this.events.get(listenEvent).update(json);
                             } else {
@@ -101,6 +100,28 @@ public class TCPClient {
                 try {
                     ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
                     outputStream.writeObject(new String[]{event, json});
+                    outputStream.flush();
+                    System.out.println("sent");
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }).start();
+        } else {
+            /**
+             * wait for socket disponibility
+             * and store it in an arraylist
+             */
+            this.eventsStacks.add(new String[]{event, json});
+        }
+        return this;
+    }
+    
+    public synchronized TCPClient emit(String event, String json, String destination) {
+        if (this.socket != null && !this.socket.isClosed()) {
+            new Thread(() -> {
+                try {
+                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                    outputStream.writeObject(new String[]{event, json, destination});
                     outputStream.flush();
                 } catch (IOException e) {
                     e.printStackTrace();
