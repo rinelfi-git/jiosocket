@@ -1,7 +1,7 @@
 package mg.rinelfi.jiosocket.client;
 
 import mg.rinelfi.jiosocket.SocketEvents;
-import mg.rinelfi.jiosocket.TCPCallback;
+import mg.rinelfi.jiosocket.ConnectedCallback;
 
 import java.io.*;
 import java.net.Socket;
@@ -11,15 +11,16 @@ import java.util.List;
 import java.util.Map;
 
 public class TCPClient {
+
     private Socket socket;
     private boolean connected, reconnect;
     private final String target;
     private final int tcpPort;
     private int udpPort, timeout;
-    private final Map<String, TCPCallback> events;
+    private final Map<String, ConnectedCallback> events;
     private ObjectInputStream inputStream;
     private final List<String[]> eventsStacks;
-    
+
     public TCPClient(String target, int tcpPort) {
         this.target = target;
         this.tcpPort = tcpPort;
@@ -27,9 +28,9 @@ public class TCPClient {
         this.timeout = 3000;
         this.events = new HashMap<>();
         this.eventsStacks = new ArrayList<>();
-        
+
     }
-    
+
     public void connect() {
         Thread t = new Thread(() -> {
             while (!this.connected) {
@@ -58,7 +59,7 @@ public class TCPClient {
         t.setDaemon(true);
         t.start();
     }
-    
+
     private void listen() {
         Thread thread = new Thread(() -> {
             try {
@@ -68,7 +69,7 @@ public class TCPClient {
                     new Thread(() -> {
                         String[] input = (String[]) object;
                         String listenEvent = input[0],
-                            json = input[1];
+                                json = input[1];
                         if (this.events.containsKey(listenEvent)) {
                             if (listenEvent.equals(SocketEvents.CONNECT)) {
                                 this.connected = true;
@@ -80,103 +81,95 @@ public class TCPClient {
                     }).start();
                 }
             } catch (IOException | ClassNotFoundException e) {
+                this.connected = false;
                 // e.printStackTrace();
-                if (this.socket.isClosed() || !this.socket.isConnected()) {
-                    /**
-                     * Check if client want the socket to reconnect after its link has broken
-                     */
-                    if(this.reconnect) this.connect();
-                    System.out.println("[WARNING] Fin de la connexion ou erreur de conversion");
+                /**
+                 * Check if client want the socket to reconnect after its link
+                 * has broken
+                 */
+                if (this.reconnect) {
+                    this.connect();
                 }
+                System.out.println("[WARNING] Fin de la connexion ou erreur de conversion");
             }
         });
         thread.setDaemon(true);
         thread.start();
     }
-    
+
     public synchronized TCPClient emit(String event, String json) {
         if (this.socket != null && !this.socket.isClosed()) {
-            new Thread(() -> {
-                try {
-                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                    outputStream.writeObject(new String[]{event, json});
-                    outputStream.flush();
-                    System.out.println("sent");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }).start();
+            try {
+                ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
+                outputStream.writeObject(new String[]{event, json});
+                outputStream.flush();
+            } catch (IOException e) {
+            }
         } else {
             /**
-             * wait for socket disponibility
-             * and store it in an arraylist
+             * wait for socket disponibility and store it in an arraylist
              */
             this.eventsStacks.add(new String[]{event, json});
         }
         return this;
     }
-    
-    public synchronized TCPClient emit(String event, String json, String destination) {
-        if (this.socket != null && !this.socket.isClosed()) {
-            new Thread(() -> {
-                try {
-                    ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                    outputStream.writeObject(new String[]{event, json, destination});
-                    outputStream.flush();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }).start();
-        } else {
-            /**
-             * wait for socket disponibility
-             * and store it in an arraylist
-             */
-            this.eventsStacks.add(new String[]{event, json});
-        }
-        return this;
-    }
-    
-    public TCPClient on(String event, TCPCallback callback) {
+
+    public TCPClient on(String event, ConnectedCallback callback) {
         this.events.put(event, callback);
         return this;
     }
-    
+
     public TCPClient setAutoreconnection(boolean reconnection) {
         this.reconnect = reconnection;
         return this;
     }
-    
+
     public TCPClient setTimeout(int timeout) {
         this.timeout = timeout;
         return this;
     }
-    
+
     public String getRemoteAddress() {
         String remoteAddress;
-        if(this.socket == null) remoteAddress = "localhost";
-        else remoteAddress = this.socket.getInetAddress().getCanonicalHostName();
+        if (this.socket == null) {
+            remoteAddress = "localhost";
+        } else {
+            remoteAddress = this.socket.getInetAddress().getCanonicalHostName();
+        }
         return remoteAddress;
     }
-    
+
     public int getRemotePort() {
         int remotePort;
-        if(this.socket == null) remotePort = -1;
-        else remotePort = this.socket.getPort();
+        if (this.socket == null) {
+            remotePort = -1;
+        } else {
+            remotePort = this.socket.getPort();
+        }
         return remotePort;
     }
-    
+
     public String getLocalAddress() {
         String localAddress;
-        if(this.socket == null) localAddress = "localhost";
-        else localAddress = this.socket.getLocalAddress().getCanonicalHostName();
+        if (this.socket == null) {
+            localAddress = "localhost";
+        } else {
+            localAddress = this.socket.getLocalAddress().getCanonicalHostName();
+        }
         return localAddress;
     }
-    
+
     public int getLocalPort() {
         int localPort;
-        if(this.socket == null) localPort = -1;
-        else localPort = this.socket.getLocalPort();
+        if (this.socket == null) {
+            localPort = -1;
+        } else {
+            localPort = this.socket.getLocalPort();
+        }
         return localPort;
+    }
+
+    public void disconnect() {
+        this.emit(SocketEvents.DISCONNECT, "");
     }
 }
