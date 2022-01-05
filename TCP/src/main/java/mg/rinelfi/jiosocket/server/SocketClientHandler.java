@@ -1,26 +1,26 @@
 package mg.rinelfi.jiosocket.server;
 
 import mg.rinelfi.jiosocket.SocketEvents;
-import mg.rinelfi.jiosocket.ConnectedCallback;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
-class ConnectedTCPClientHandler implements Runnable {
+class SocketClientHandler implements Runnable {
     private final Socket socket;
-    private Map<String, ConnectedCallback> events;
+    private Map<String, SocketCallbackConsumer> events;
     private SocketCloseListener socketCloseListener;
     private boolean connected;
     
-    public ConnectedTCPClientHandler(Socket client) {
+    public SocketClientHandler(Socket client) {
         this.connected = false;
         this.events = new HashMap<>();
         this.socket = client;
     }
     
-    public ConnectedTCPClientHandler on(String event, ConnectedCallback callback) {
+    public SocketClientHandler on(String event, SocketCallbackConsumer callback) {
         this.events.put(event, callback);
         return this;
     }
@@ -30,12 +30,13 @@ class ConnectedTCPClientHandler implements Runnable {
         this.events.put(SocketEvents.DISCONNECT, null);
     }
     
-    public ConnectedTCPClientHandler emit(String event, String json) {
+    public SocketClientHandler send(String event, String json) {
         try {
             if (this.socket != null && !this.socket.isClosed()) {
                 ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
                 outputStream.writeObject(new String[]{event, json});
                 outputStream.flush();
+                System.out.println("sending : " + json);
             }
         } catch (IOException e) {
         }
@@ -64,10 +65,10 @@ class ConnectedTCPClientHandler implements Runnable {
              * and trigger callback on event
              */
             String listenEvent = input[0],
-                json = input[1]; 
-           if (this.events.containsKey(listenEvent)) {
+                json = input[1];
+            if (this.events.containsKey(listenEvent)) {
                 if (listenEvent.equals(SocketEvents.DISCONNECT)) this.socket.close();
-                else this.events.get(listenEvent).update(json);
+                else this.events.get(listenEvent).consume(new JSONObject(json));
             }
         } catch (IOException | ClassNotFoundException e) {
             /**
@@ -79,8 +80,8 @@ class ConnectedTCPClientHandler implements Runnable {
         }
     }
     
-    public void setEvents(Map<String, ConnectedCallback> events) {
-        if(this.events.size() > 0) this.events.putAll(events);
+    public void setEvents(Map<String, SocketCallbackConsumer> events) {
+        if (this.events.size() > 0) this.events.putAll(events);
         else this.events = events;
     }
 }

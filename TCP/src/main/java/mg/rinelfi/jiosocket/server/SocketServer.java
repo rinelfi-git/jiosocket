@@ -1,6 +1,5 @@
 package mg.rinelfi.jiosocket.server;
 
-import mg.rinelfi.jiosocket.ConnectedCallback;
 import mg.rinelfi.jiosocket.SocketEvents;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -11,11 +10,11 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ConnectedTCPServer extends TCPServer {
-    private final Map<String, ConnectedCallback> events;
-    private final Map<String, ConnectedTCPClientHandler> handlers;
+public class SocketServer extends Server {
+    private final Map<String, SocketCallbackConsumer> events;
+    private final Map<String, SocketClientHandler> handlers;
     
-    public ConnectedTCPServer(int port) throws IOException {
+    public SocketServer(int port) throws IOException {
         super(port);
         this.events = new HashMap<>();
         this.handlers = new HashMap<>();
@@ -26,7 +25,7 @@ public class ConnectedTCPServer extends TCPServer {
         while (!this.server.isClosed()) {
             try {
                 Socket client = this.server.accept();
-                ConnectedTCPClientHandler handler = new ConnectedTCPClientHandler(client);
+                SocketClientHandler handler = new SocketClientHandler(client);
                 long currentTime = System.currentTimeMillis();
                 String hash = BCrypt.hashpw(Long.toString(currentTime), BCrypt.gensalt(12));
                 // Payloads for new user
@@ -39,7 +38,7 @@ public class ConnectedTCPServer extends TCPServer {
                 this.handlers.put(hash, handler);
                 
                 // sending connection status done
-                handler.emit(SocketEvents.CONNECT, jsonObject.toString());
+                handler.send(SocketEvents.CONNECT, jsonObject.toString());
                 
                 // prepare to broadcast the connected users
                 broadcastIdentity();
@@ -61,9 +60,8 @@ public class ConnectedTCPServer extends TCPServer {
                 });
                 
                 handler.on(SocketEvents.RELOAD_IDENTITY, data -> {
-                    JSONObject json = new JSONObject(data);
-                    String old = json.getString("old");
-                    String current = json.getString("current");
+                    String old = data.getString("old");
+                    String current = data.getString("current");
                     this.handlers.put(current, handler);
                     this.handlers.remove(old);
                     this.broadcastIdentity();
@@ -77,19 +75,19 @@ public class ConnectedTCPServer extends TCPServer {
         }
     }
     
-    public TCPServer on(String event, ConnectedCallback callback) {
-        this.events.put(event, callback);
-        this.handlers.forEach((hash, handler) -> handler.on(event, callback));
+    public SocketServer on(String event, SocketCallbackConsumer consumer) {
+        this.events.put(event, consumer);
+        this.handlers.forEach((hash, handler) -> handler.on(event, consumer));
         return this;
     }
     
-    public TCPServer emit(String event, String json) {
-        this.handlers.forEach((hash, handler) -> handler.emit(event, json));
+    public SocketServer emit(String event, String json) {
+        this.handlers.forEach((hash, handler) -> handler.send(event, json));
         return this;
     }
     
-    public TCPServer emit(String event, String json, String destination) {
-        this.handlers.get(destination).emit(event, json);
+    public SocketServer emit(String event, String json, String destination) {
+        this.handlers.get(destination).send(event, json);
         return this;
     }
     

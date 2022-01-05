@@ -1,7 +1,8 @@
 package mg.rinelfi.jiosocket.client;
 
 import mg.rinelfi.jiosocket.SocketEvents;
-import mg.rinelfi.jiosocket.ConnectedCallback;
+import mg.rinelfi.jiosocket.server.SocketCallbackConsumer;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.net.Socket;
@@ -10,18 +11,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TCPClient {
+public class SocketClient {
 
     private Socket socket;
     private boolean connected, reconnect;
     private final String target;
     private final int tcpPort;
     private int udpPort, timeout;
-    private final Map<String, ConnectedCallback> events;
+    private final Map<String, SocketCallbackConsumer> events;
     private ObjectInputStream inputStream;
     private final List<String[]> eventsStacks;
 
-    public TCPClient(String target, int tcpPort) {
+    public SocketClient(String target, int tcpPort) {
         this.target = target;
         this.tcpPort = tcpPort;
         this.reconnect = true;
@@ -73,9 +74,9 @@ public class TCPClient {
                         if (this.events.containsKey(listenEvent)) {
                             if (listenEvent.equals(SocketEvents.CONNECT)) {
                                 this.connected = true;
-                                this.events.get(listenEvent).update(json);
+                                this.events.get(listenEvent).consume(new JSONObject(json));
                             } else {
-                                this.events.get(listenEvent).update(json);
+                                this.events.get(listenEvent).consume(new JSONObject(json));
                             }
                         }
                     }).start();
@@ -97,7 +98,7 @@ public class TCPClient {
         thread.start();
     }
 
-    public synchronized TCPClient emit(String event, String json) {
+    public synchronized SocketClient emit(String event, String json) {
         if (this.socket != null && !this.socket.isClosed()) {
             try {
                 ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
@@ -114,17 +115,17 @@ public class TCPClient {
         return this;
     }
 
-    public TCPClient on(String event, ConnectedCallback callback) {
+    public SocketClient on(String event, SocketCallbackConsumer callback) {
         this.events.put(event, callback);
         return this;
     }
 
-    public TCPClient setAutoreconnection(boolean reconnection) {
+    public SocketClient setAutoreconnection(boolean reconnection) {
         this.reconnect = reconnection;
         return this;
     }
 
-    public TCPClient setTimeout(int timeout) {
+    public SocketClient setTimeout(int timeout) {
         this.timeout = timeout;
         return this;
     }

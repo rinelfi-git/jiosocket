@@ -1,22 +1,23 @@
 package mg.rinelfi.jiosocket.server;
 
-import mg.rinelfi.jiosocket.ConnectedCallback;
+import org.json.JSONObject;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
-class DisconnectedTCPClientHandler implements Runnable {
+public class PseudoWebClientHandler implements Runnable {
     private final Socket socket;
-    private Map<String, DisconnectedCallback> events;
+    private Map<String, PseudoWebCallbackConsumer> events;
+    private String currentEvent;
     
-    public DisconnectedTCPClientHandler(Socket client) {
+    public PseudoWebClientHandler(Socket client) {
         this.events = new HashMap<>();
         this.socket = client;
     }
     
-    public void on(String event, DisconnectedCallback callback) {
+    public void on(String event, PseudoWebCallbackConsumer callback) {
         this.events.put(event, callback);
     }
     
@@ -24,7 +25,7 @@ class DisconnectedTCPClientHandler implements Runnable {
         try {
             if (this.socket != null && !this.socket.isClosed()) {
                 ObjectOutputStream outputStream = new ObjectOutputStream(new BufferedOutputStream(this.socket.getOutputStream()));
-                outputStream.writeObject(json);
+                outputStream.writeObject(new String[]{currentEvent, json});
                 outputStream.flush();
                 outputStream.close();
                 this.socket.close();
@@ -53,7 +54,8 @@ class DisconnectedTCPClientHandler implements Runnable {
             String listenEvent = input[0],
                 json = input[1];
             if (this.events.containsKey(listenEvent)) {
-                this.events.get(listenEvent).consumeRequest(json, this);
+                this.events.get(listenEvent).consume(new JSONObject(json), this);
+                this.currentEvent = listenEvent;
             }
         } catch (IOException | ClassNotFoundException e) {
             /**
@@ -63,7 +65,7 @@ class DisconnectedTCPClientHandler implements Runnable {
         }
     }
     
-    public void setEvents(Map<String, DisconnectedCallback> events) {
+    public void setEvents(Map<String, PseudoWebCallbackConsumer> events) {
         if (this.events.size() > 0) this.events.putAll(events);
         else this.events = events;
     }

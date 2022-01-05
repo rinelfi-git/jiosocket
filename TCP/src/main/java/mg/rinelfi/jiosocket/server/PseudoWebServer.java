@@ -1,7 +1,5 @@
 package mg.rinelfi.jiosocket.server;
 
-import mg.rinelfi.jiosocket.ConnectedCallback;
-
 import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -9,11 +7,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class DisconnectedTCPServer extends TCPServer{
-    private final Map<String, DisconnectedCallback> events;
-    private final List<DisconnectedTCPClientHandler> handlers;
+public class PseudoWebServer extends Server {
+    private final Map<String, PseudoWebCallbackConsumer> events;
+    private final List<PseudoWebClientHandler> handlers;
     
-    public DisconnectedTCPServer(int port) throws IOException {
+    public PseudoWebServer(int port) throws IOException {
         super(port);
         this.events = new HashMap<>();
         this.handlers = new ArrayList<>();
@@ -24,7 +22,7 @@ public class DisconnectedTCPServer extends TCPServer{
         while(!this.server.isClosed()) {
             try {
                 Socket client = this.server.accept();
-                DisconnectedTCPClientHandler handler = new DisconnectedTCPClientHandler(client);
+                PseudoWebClientHandler handler = new PseudoWebClientHandler(client);
                 handler.setEvents(this.events);
                 Thread t = new Thread(handler);
                 t.setDaemon(true);
@@ -35,7 +33,7 @@ public class DisconnectedTCPServer extends TCPServer{
         }
     }
     
-    public synchronized TCPServer on(String event, DisconnectedCallback callback) {
+    public synchronized Server on(String event, PseudoWebCallbackConsumer callback) {
         this.events.put(event, callback);
         this.handlers.forEach(handler -> handler.on(event, callback));
         return this;
